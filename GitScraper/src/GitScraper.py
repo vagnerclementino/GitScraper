@@ -1,48 +1,112 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 '''
 Created on 18/10/2014
 
 @author: Vagner Clementino
 '''
 import requests
-from lxml import html
+import json
+import psycopg2
+
+
+def get_dict_links(response_header):
+    
+    '''----------------------------------------------
+       Função que recebe um cabeçalho de response
+       e retorna um novo dictionary com os links
+       da próxima página e a última página da
+       consulta proposta    
+    ------------------------------------------------'''
+    
+    #Recupera a string com os dados dos links
+    links = response_header['link']
+    
+    '''*******************************
+      Removendo os caracteres:
+       - " " Espaço
+       - >   Maior
+       - <  Menor
+    *******************************'''
+    links = links.replace(" ", "") 
+    links = links.replace("<", "") 
+    links = links.replace(">", "") 
+    
+    #Criando uma lista da string
+    list_pages = links.split(",")
+    
+    #Criando uma nova lista com o primeiro 
+    #item da lista
+    next_page =  list_pages[0].split(";")
+    
+    #Criando uma nova lista com o segundo 
+    #item da lista
+    last_page =  list_pages[1].split(";")
+    
+    dict_links = dict(next=next_page[0],last=last_page[0])
+    
+    return dict_links
 
 if __name__ == '__main__':
-    #url = 'https://github.com/search?l=Java&q=language%3AJava&ref=advsearch&type=Repositories&utf8=%E2%9C%93&p='
-    url = 'https://api.github.com/search/repositories?q=language:java&sort=stars&order=desc&page=2'
-    offset = 1
-    total_recuperado = 0
-    linha = 1
+    url = 'https://api.github.com/search/repositories?access_token=29bd7d59b8a227b60e0c8b0aa2e517c2963bd398&q=language:java&sort=stars&order=desc&page=33'
     list_proj_recuperados = []
-    #price
-    url_nova = url + str(offset)    
-    while total_recuperado < 200:
+    index = 1
+    output_file = open('../outs/projects_data.json','w')
+    SQL_QUERY = '''INSERT INTO raw_projects_data(id_raw_projects_data,json_data)
+                   VALUES(nextval('raw_projects_data_id_raw_projects_data_seq'), %s);
+                '''
+    
+    #Criando conexão com o banco de dados
+    conn = psycopg2.connect("dbname=mes user=mes password=mes2014")
+    
+    cur = conn.cursor()
+    
+    
+    while True:         
         
-    # print(url_nova)
-        page = requests.get(url_nova)
-        #print(page)
-        #print(page.status_code)
-        print(page.json())
-        tree = html.fromstring(page.text)
-        #print (tree)
-        price = tree.xpath('//*[@id="container"]/div[2]/div[2]/ul/li[%d]/h3/a/@href' % (linha))
-        #price = tree.xpath('//*[@id="container"]/div[2]/div[2]/ul/li[%d]/div[1]/text()' % (linha))
+        response = requests.get(url)    
+    
+        '''------------------------------------
+        Verificando se a conexao ocorreu
+        corretamente.
+        ------------------------------------'''
+        if response.status_code == 200 :   
+   
+            
+            json_data = response.json()
+            for p in  json_data["items"]:
+                raw_json = json.dumps(p, indent=1)
+                list_proj_recuperados.append(raw_json)
+                #Escrevendo os dados em um arquivo
+                json.dump(raw_json , output_file)
+                output_file.write("\n")
+                cur.execute(SQL_QUERY,(raw_json,))
+                
+           
+            dict_links = get_dict_links(response.headers)
+            
+            next_page = dict_links['next']
+            last_page = dict_links['last']
+            
+            
+            if next_page == last_page:
+                break
+            else:
+                url = next_page
+        else:
+            break
+    for project in list_proj_recuperados:
         
-        #for p in price:
-        if len(price) > 0 :
-            list_proj_recuperados.append(str(price[0]).strip(' '))
-            print('%d - %s' % (total_recuperado + 1, str(price[0]).strip(' ')))       
-            total_recuperado += 1
-            linha += 1
-        if linha == 10 :
-            offset += 1
-            linha = 1
-            url_nova = url + str(offset)
-            print('---------------------PAGINACAO---------------------------------')
-    print('Total de projestos recuperados: %d' % len(list_proj_recuperados))
-    for p in list_proj_recuperados:
-        print p
-    print('Everything is gonna be alright!')    
-                        
+        project_data = json.loads(project)
+        
        
-                 
-        
+        print ("%d -  %s - %s" % (index , project_data['full_name'] , project_data['html_url']))
+        print '*****************************************************'
+        index += 1
+    print('Everythig ins gonna be alright!')
+    
+    output_file.close()
+    conn.commit()
+    cur.close()
+    conn.close()
+    
