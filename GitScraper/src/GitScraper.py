@@ -80,6 +80,7 @@ if __name__ == '__main__':
                 #Escrevendo os dados em um arquivo
                 json.dump(raw_json , output_file)
                 output_file.write("\n")
+                #Inserindo os dados no banco 
                 cur.execute(SQL_QUERY,(raw_json,))
                 
            
