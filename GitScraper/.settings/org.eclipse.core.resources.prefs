@@ -1,2 +1,5 @@
 eclipse.preferences.version=1
 encoding//src/GitScraper.py=utf-8
+encoding//src/control_gitscraper/GitScaperError.py=utf-8
+encoding//src/control_gitscraper/Project.py=utf-8
+encoding//src/control_gitscraper/TestProjectClass.py=utf-8

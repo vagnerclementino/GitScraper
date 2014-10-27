@@ -47,14 +47,31 @@ def get_dict_links(response_header):
     
     return dict_links
 
-if __name__ == '__main__':
-    url = 'https://api.github.com/search/repositories?access_token=29bd7d59b8a227b60e0c8b0aa2e517c2963bd398&q=language:java&sort=stars&order=desc&page=33'
-    list_proj_recuperados = []
-    index = 1
-    output_file = open('../outs/projects_data.json','w')
+def insert_raw_projects_data(a_cur, a_json_data):
     SQL_QUERY = '''INSERT INTO raw_projects_data(id_raw_projects_data,json_data)
                    VALUES(nextval('raw_projects_data_id_raw_projects_data_seq'), %s);
                 '''
+    a_cur.execute(SQL_QUERY,(a_json_data,))    
+    
+
+if __name__ == '__main__':
+    url = 'https://api.github.com/search/repositories?'         #basic URL
+    ACESS_TOKEN ='29bd7d59b8a227b60e0c8b0aa2e517c2963bd398'     #TOKEN DE ACESSO
+    LANGUAGE = 'java'                                           #Linguam dos projetos
+    SORT = 'forks'                                              #Critério de ordenação
+    ORDER = 'desc'                                              #Tipo de ordenação dos dados    
+    '''-----------------------------------------------------------------
+        Criando a URL DE CONSULTA
+    -------------------------------------------------------------------'''
+    url = url + 'access_token=' + ACESS_TOKEN + '&'
+    url = url + 'q=language:'   + LANGUAGE + '&'
+    url = url + 'sort='         + SORT + '&'
+    url = url + 'order='        + ORDER
+    print url
+    list_proj_recuperados = []
+    index = 1
+    #output_file = open('../outs/projects_data.json','w')
+    
     
     #Criando conexão com o banco de dados
     conn = psycopg2.connect("dbname=mes user=mes password=mes2014")
@@ -78,11 +95,9 @@ if __name__ == '__main__':
                 raw_json = json.dumps(p, indent=1)
                 list_proj_recuperados.append(raw_json)
                 #Escrevendo os dados em um arquivo
-                json.dump(raw_json , output_file)
-                output_file.write("\n")
+                #json.dump(raw_json , output_file)
                 #Inserindo os dados no banco 
-                cur.execute(SQL_QUERY,(raw_json,))
-                
+                insert_raw_projects_data(cur, raw_json)           
            
             dict_links = get_dict_links(response.headers)
             
@@ -90,7 +105,7 @@ if __name__ == '__main__':
             last_page = dict_links['last']
             
             
-            if next_page == last_page:
+            if next_page == last_page:                
                 break
             else:
                 url = next_page
@@ -104,9 +119,9 @@ if __name__ == '__main__':
         print ("%d -  %s - %s" % (index , project_data['full_name'] , project_data['html_url']))
         print '*****************************************************'
         index += 1
+    print('Total de projetos recuperados: %d' % len(list_proj_recuperados))
     print('Everythig ins gonna be alright!')
     
-    output_file.close()
     conn.commit()
     cur.close()
     conn.close()
