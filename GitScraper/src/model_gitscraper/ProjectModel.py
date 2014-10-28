@@ -1,26 +1,58 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 '''
-Created on 26/10/2014
+Created on 27/10/2014
 
-@author: Vagner Clementino
+@author: vagner
 '''
-
-import json
+from model_gitscraper.ConnectionManager import ConnectionManager
 import psycopg2
-from control_gitscraper.Project import Project
-from control_gitscraper.GitScaperError import GitScrapeError
 from datetime import datetime
+from control_gitscraper.GitScaperError import GitScrapeError
 
+class ProjectModel(object):
+    '''
+    Visa persistir os dados de um Projeto no banco de dados
+    '''
+    __DB_NAME =  'mes'
+    __USER    =  'mes'
+    __PASSWORD = 'mes2014'
 
-if __name__ == '__main__':
-
-    SQL_QUERY = '''SELECT rpd.id_raw_projects_data
-                   ,      rpd.json_data
-                   FROM   public.raw_projects_data  rpd;
-                 '''
+    def __init__(self):
+        '''
+        Constructor
+        '''
+        self.__conn_manager = ConnectionManager(dbname = self.__DB_NAME, user = self.__USER, password = self.__PASSWORD)
+        
+    def __insert_raw_project_data(self, a_cur, a_json_data):
+        SQL_INSERT = '''
+                       INSERT INTO raw_projects_data(id_raw_projects_data,json_data, data_de_atualizacao)
+                       VALUES(%s, %s, %s);
+                    '''
+        
+        SQL_GET_SQ = ''' SELECT nextval('raw_projects_data_id_raw_projects_data_seq') '''
+        
+        
+        try:
+            a_cur.execute(SQL_GET_SQ) 
+            
+            a_register = a_cur.fetchone()
+            
+            sq_next_value = a_register[0]
+        except psycopg2.Error as e:
+            raise GitScrapeError("Erro ao obter o next valeu da sequence raw_projects_data_id_raw_projects_data_seq do banco: Error code {0}. Descrição do erro: {1}".format(e.pgcode, e.pgerror)) 
+        
+        try:
+            a_cur.execute(SQL_INSERT, (sq_next_value,a_json_data, datetime.now()))
+            
+        except psycopg2.Error as e:
+            raise GitScrapeError("Erro ao inserir na tabela raw_project_data: Error code {0}. Descrição do erro: {1}".format(e.pgcode, e.pgerror))     
+        
+        return sq_next_value 
     
-    SQL_INSERT = '''INSERT INTO public.projects
+    def __insert_projects(self, a_cur,id_raw_projects_data, project):
+        
+        SQL_INSERT = '''INSERT INTO public.projects
                                (id_projects,
                                id_raw_projects_data,
                                git_project_cod,
@@ -65,24 +97,8 @@ if __name__ == '__main__':
                                 %s,
                                 %s
                                 );'''
-    
-    project_list = []
-    
-    conn = psycopg2.connect("dbname=mes user=mes password=mes2014")
-    
-    cur = conn.cursor()
-    cur_2 = conn.cursor()
-    
-    cur.execute(SQL_QUERY)
-    
-    for a_record in cur:
-        id_raw_projects_data = a_record[0]
-        json_data = json.loads(a_record[1])
         try:
-            print id_raw_projects_data
-            project = Project(json_data)            
-            project_list.append(project)
-            cur_2.execute(SQL_INSERT, (id_raw_projects_data,
+            a_cur.execute(SQL_INSERT, (id_raw_projects_data,
                                        project.get_git_project_cod(),
                                        project.get_project_name(),
                                        project.get_description(),
@@ -103,18 +119,32 @@ if __name__ == '__main__':
                                        project.get_default_branche(),
                                        datetime.now()                                       
                                        ))
-        except GitScrapeError as gse:
-            cur.close()
-            cur_2.rollback()
-            cur_2.close()
-            conn.rollback()
-            exit(3)
-    print ('Total de Projetos: %d' % len(project_list))        
-    for p in project_list:
-        print p.get_project_name()        
+        except psycopg2.Error as e:
+            raise GitScrapeError("Erro ao inserir na tabela project: Error code {0}. Descrição do erro: {1}".format(e.pgcode, e.pgerror))     
             
-    cur.close()
-    cur_2.close()
-    conn.commit()
-    conn.close()
-    print ('Everything is gonna be alright!')
+        
+        
+    
+    def persite_project(self, a_project):
+        
+        try:
+            self.__conn_manager.connect_db()
+            
+            cur = self.__conn_manager.get_cursor()
+            
+            id_raw_project_data = self.__insert_raw_project_data(cur, a_project.get_project_json_data())
+            
+            self.__insert_projects(cur, id_raw_project_data, a_project)
+            
+            self.__conn_manager.commit_transation()       
+            
+        except GitScrapeError as e:
+            raise e
+            
+        
+        
+        
+        
+        
+            
+        
