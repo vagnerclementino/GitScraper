@@ -139,7 +139,9 @@ class ProjectModel(object):
             self.__conn_manager.commit_transation()       
             
         except GitScrapeError as e:
+            self.__conn_manager.rollback_transation()
             raise e
+            
             
         
         

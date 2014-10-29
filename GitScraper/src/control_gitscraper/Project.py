@@ -181,10 +181,8 @@ class Project(object):
     def get_default_branche(self):
         return (self.__default_branche)
     
-    
-    
-    
-        
+    def __del__(self):
+        pass     
         
    
     def show(self):

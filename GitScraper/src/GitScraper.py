@@ -20,18 +20,21 @@ if __name__ == '__main__':
     
         print 'Total de projetos recuperados: {0}'.format(len(json_data_list))
         
-        project = Project(json.loads(json_data_list[0]))
-        
         projectModel = ProjectModel()
         
-        projectModel.persite_project(project)
-        
-        print(project.get_project_name())
-        
     except GitScrapeError as e:
-        e.show_error()    
-    
+        e.show_error()      
+        
+    for jdl in json_data_list:
+        try:
+            project = Project(json.loads(jdl))
+        
+            projectModel.persite_project(project)
+        
+            #print(project.get_project_name())
+                        
+        except GitScrapeError as e:
+            e.show_error() 
+            
     print('Everythig ins gonna be alright!')
-    
-
     
